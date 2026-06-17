@@ -1,0 +1,13 @@
+# Node.js
+backend/node_modules/
+backend/.env
+backend/firebase-service-account.json
+
+# Python
+ml-service/venv/
+ml-service/__pycache__/
+ml-service/*.pyc
+
+# OS files
+.DS_Store
+Thumbs.db
