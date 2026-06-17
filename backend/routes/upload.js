@@ -18,5 +18,28 @@ router.post('/', protect(['nurse']), (req, res) => {
         fileUrl: mockS3Url
     });
 });
+// @desc    Get secure signed URL for S3 document (Mock)
+// @route   GET /api/upload/signed-url/:filename
+// @access  Private (Nurse/Admin)
+router.get('/signed-url/:filename', protect(['admin', 'nurse']), (req, res) => {
+    const { filename } = req.params;
+    
+    // Simulate AWS signature generation
+    const crypto = require('crypto');
+    const signature = crypto.createHmac('sha256', process.env.JWT_SECRET || 'secret')
+                            .update(`${filename}-${Date.now()}`)
+                            .digest('hex');
+                            
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+    
+    const signedUrl = `https://prv-nurse-bucket.s3.amazonaws.com/credentials/${filename}?expires=${expiresAt.getTime()}&signature=${signature}`;
+    
+    console.log(`[AWS S3 Mock] Generated signed URL for ${filename} requested by ${req.user.role}`);
+    
+    res.json({
+        signedUrl,
+        expiresAt
+    });
+});
 
 module.exports = router;

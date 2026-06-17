@@ -17,12 +17,37 @@ const patientSchema = new mongoose.Schema({
     address: { type: String },
     landmark: { type: String },
     
-    // Medical Info
+    // Medical Info (Encrypted at rest)
     medicalInfo: {
-        primaryCondition: { type: String },
-        medications: [{ type: String }],
-        allergies: [{ type: String }],
-        mobilityStatus: { type: String, enum: ['Independent', 'Limited', 'Bedridden'] }
+        type: String,
+        get: function(data) {
+            try {
+                if (!data || !data.includes(':')) return data ? JSON.parse(data) : {}; // Fallback for unencrypted old data
+                const crypto = require('crypto');
+                const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || '12345678901234567890123456789012';
+                const textParts = data.split(':');
+                const iv = Buffer.from(textParts.shift(), 'hex');
+                const encryptedText = Buffer.from(textParts.join(':'), 'hex');
+                const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY), iv);
+                let decrypted = decipher.update(encryptedText);
+                decrypted = Buffer.concat([decrypted, decipher.final()]);
+                return JSON.parse(decrypted.toString());
+            } catch (err) {
+                return {};
+            }
+        },
+        set: function(data) {
+            if (!data) return data;
+            const crypto = require('crypto');
+            const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || '12345678901234567890123456789012';
+            const IV_LENGTH = 16;
+            const text = typeof data === 'string' ? data : JSON.stringify(data);
+            const iv = crypto.randomBytes(IV_LENGTH);
+            const cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY), iv);
+            let encrypted = cipher.update(text);
+            encrypted = Buffer.concat([encrypted, cipher.final()]);
+            return iv.toString('hex') + ':' + encrypted.toString('hex');
+        }
     },
     
     // Emergency Contact
@@ -33,8 +58,12 @@ const patientSchema = new mongoose.Schema({
     },
 
     // Mobile Money Details
-    mobileMoneyNumber: { type: String }
-}, { timestamps: true });
+    mobileMoneyNumber: { type: String },
+
+    // Password Reset
+    resetPasswordToken: String,
+    resetPasswordExpire: Date
+}, { timestamps: true, toJSON: { getters: true }, toObject: { getters: true } });
 
 patientSchema.index({ location: '2dsphere' });
 

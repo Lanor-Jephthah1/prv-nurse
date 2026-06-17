@@ -20,8 +20,10 @@ const bookingSchema = new mongoose.Schema({
     schedule: {
         startDate: { type: Date, required: true },
         duration: { type: Number }, // in hours or days depending on type
-        timeSlots: [String] // e.g. Morning, Afternoon
+        timeSlots: [String], // e.g. Morning, Afternoon
+        frequency: { type: String, enum: ['Once', 'Daily', 'Weekly', 'Monthly'], default: 'Once' }
     },
+    seriesId: { type: mongoose.Schema.Types.ObjectId }, // Links recurring bookings together
     
     // Visit Documentation
     visitNotes: [{

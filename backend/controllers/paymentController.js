@@ -1,4 +1,5 @@
 const Booking = require('../models/Booking');
+const Payment = require('../models/Payment');
 
 // @desc    Initiate a MoMo payment collection for a booking
 // @route   POST /api/payments/collect
@@ -31,17 +32,31 @@ exports.initiateCollection = async (req, res) => {
 // @access  Public (Called by MTN servers)
 exports.momoWebhook = async (req, res) => {
     try {
-        const { transactionId, status, bookingId } = req.body;
+        const { transactionId, status, bookingId, amount } = req.body;
 
         console.log(`[MoMo Webhook] Received status update for transaction ${transactionId}: ${status}`);
 
         if (status === 'SUCCESSFUL') {
-            // Update booking status or record payment status in booking
             const booking = await Booking.findById(bookingId);
             if (booking) {
-                booking.status = 'Completed'; // release hold
+                const serviceFee = amount * 0.10; // 10% platform fee
+                const heldUntil = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48 hours
+                
+                const payment = new Payment({
+                    bookingId,
+                    patientId: booking.patientId,
+                    nurseId: booking.nurseId,
+                    amount,
+                    serviceFee,
+                    momoRef: transactionId,
+                    status: 'Held',
+                    heldUntil
+                });
+                await payment.save();
+
+                booking.status = 'Completed'; // Medical service done
                 await booking.save();
-                console.log(`[MoMo Webhook] Booking ${bookingId} marked as completed after successful payment`);
+                console.log(`[MoMo Webhook] Payment ${payment._id} held until ${heldUntil}`);
             }
         }
 
@@ -49,5 +64,28 @@ exports.momoWebhook = async (req, res) => {
     } catch (error) {
         console.error('Webhook error:', error.message);
         res.status(500).json({ message: 'Webhook processing failed' });
+    }
+};
+
+// @desc    Simulate Cron Job to release held payments
+// @route   POST /api/payments/release-holds
+// @access  Private (Admin only)
+exports.releaseHeldPayments = async (req, res) => {
+    try {
+        const now = new Date();
+        const paymentsToRelease = await Payment.find({ status: 'Held', heldUntil: { $lte: now } });
+        
+        let releasedCount = 0;
+        for (let payment of paymentsToRelease) {
+            payment.status = 'Disbursed';
+            await payment.save();
+            // In reality, this triggers MoMo disbursement to Nurse wallet
+            console.log(`[MoMo API] Disbursed GHS ${payment.amount - payment.serviceFee} to Nurse ${payment.nurseId}`);
+            releasedCount++;
+        }
+        
+        res.json({ message: `Released ${releasedCount} payments` });
+    } catch (error) {
+        res.status(500).json({ message: 'Release failed', error: error.message });
     }
 };

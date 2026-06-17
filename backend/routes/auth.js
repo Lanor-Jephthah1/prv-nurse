@@ -6,7 +6,10 @@ const {
     registerAdmin,
     loginNurse, 
     loginPatient, 
-    loginAdmin 
+    loginAdmin,
+    refreshToken,
+    forgotPassword,
+    resetPassword
 } = require('../controllers/authController');
 
 // Registration Routes
@@ -18,5 +21,12 @@ router.post('/register/admin', registerAdmin);
 router.post('/login/nurse', loginNurse);
 router.post('/login/patient', loginPatient);
 router.post('/login/admin', loginAdmin);
+
+// Refresh Token Route
+router.post('/refresh', refreshToken);
+
+// Password Reset Routes
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password', resetPassword);
 
 module.exports = router;

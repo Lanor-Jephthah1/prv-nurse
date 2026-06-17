@@ -78,3 +78,66 @@ exports.getActiveNurses = async (req, res) => {
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 };
+
+// @desc    Update nurse availability
+// @route   PUT /api/nurses/availability
+// @access  Private (Nurse only)
+exports.updateAvailability = async (req, res) => {
+    try {
+        const nurse = await Nurse.findById(req.user.id);
+        if (!nurse) return res.status(404).json({ message: 'Nurse not found' });
+
+        const { days, timeSlots, emergencyAvailable } = req.body;
+
+        if (days) nurse.availability.days = days;
+        if (timeSlots) nurse.availability.timeSlots = timeSlots;
+        if (emergencyAvailable !== undefined) nurse.availability.emergencyAvailable = emergencyAvailable;
+
+        await nurse.save();
+        res.json(nurse.availability);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+// @desc    Find nearby active nurses based on patient coordinates
+// @route   GET /api/nurses/nearby?lng=...&lat=...&distance=...
+// @access  Private (Patient only)
+exports.getNearbyNurses = async (req, res) => {
+    try {
+        const { lng, lat, distance } = req.query;
+
+        if (!lng || !lat) {
+            return res.status(400).json({ message: 'Please provide longitude and latitude' });
+        }
+
+        // Default distance to 10km (in meters)
+        const maxDistance = distance ? parseInt(distance, 10) * 1000 : 10000;
+
+        const nurses = await Nurse.aggregate([
+            {
+                $geoNear: {
+                    near: {
+                        type: 'Point',
+                        coordinates: [parseFloat(lng), parseFloat(lat)]
+                    },
+                    distanceField: 'distance',
+                    maxDistance: maxDistance,
+                    spherical: true,
+                    query: { status: 'Active' } // Only show active nurses
+                }
+            },
+            {
+                $project: {
+                    password: 0,
+                    nationalId: 0,
+                    licenseNumber: 0
+                }
+            }
+        ]);
+
+        res.json({ count: nurses.length, nurses });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error fetching nearby nurses', error: error.message });
+    }
+};

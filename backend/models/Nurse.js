@@ -51,7 +51,11 @@ const nurseSchema = new mongoose.Schema({
     ratings: {
         averageRating: { type: Number, default: 0 },
         totalReviews: { type: Number, default: 0 }
-    }
+    },
+    
+    // Password Reset
+    resetPasswordToken: String,
+    resetPasswordExpire: Date
 }, { timestamps: true });
 
 nurseSchema.index({ location: '2dsphere' });
