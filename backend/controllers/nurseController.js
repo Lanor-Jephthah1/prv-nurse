@@ -5,7 +5,7 @@ const Nurse = require('../models/Nurse');
 // @access  Private (Nurse only)
 exports.getProfile = async (req, res) => {
     try {
-        const nurse = await Nurse.findById(req.user.id).select('-password');
+        const nurse = await Nurse.findById(req.user.profileId).select('-password');
         if (!nurse) {
             return res.status(404).json({ message: 'Nurse not found' });
         }
@@ -20,7 +20,7 @@ exports.getProfile = async (req, res) => {
 // @access  Private (Nurse only)
 exports.updateProfile = async (req, res) => {
     try {
-        const nurse = await Nurse.findById(req.user.id);
+        const nurse = await Nurse.findById(req.user.profileId);
         if (!nurse) {
             return res.status(404).json({ message: 'Nurse not found' });
         }
@@ -84,7 +84,7 @@ exports.getActiveNurses = async (req, res) => {
 // @access  Private (Nurse only)
 exports.updateAvailability = async (req, res) => {
     try {
-        const nurse = await Nurse.findById(req.user.id);
+        const nurse = await Nurse.findById(req.user.profileId);
         if (!nurse) return res.status(404).json({ message: 'Nurse not found' });
 
         const { days, timeSlots, emergencyAvailable } = req.body;

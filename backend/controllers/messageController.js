@@ -12,7 +12,7 @@ exports.getMessages = async (req, res) => {
         const booking = await Booking.findById(bookingId);
         if (!booking) return res.status(404).json({ message: 'Booking not found' });
         
-        if (booking.patientId.toString() !== req.user.id && booking.nurseId.toString() !== req.user.id) {
+        if (booking.patientId.toString() !== req.user.profileId && booking.nurseId.toString() !== req.user.profileId) {
             return res.status(403).json({ message: 'Not authorized to view these messages' });
         }
 
@@ -34,13 +34,13 @@ exports.sendMessage = async (req, res) => {
         const booking = await Booking.findById(bookingId);
         if (!booking) return res.status(404).json({ message: 'Booking not found' });
         
-        if (booking.patientId.toString() !== req.user.id && booking.nurseId.toString() !== req.user.id) {
+        if (booking.patientId.toString() !== req.user.profileId && booking.nurseId.toString() !== req.user.profileId) {
             return res.status(403).json({ message: 'Not authorized to send messages here' });
         }
 
         const message = await Message.create({
             bookingId,
-            sender: req.user.id,
+            sender: req.user.profileId,
             senderModel: req.user.role === 'patient' ? 'Patient' : 'Nurse',
             text
         });

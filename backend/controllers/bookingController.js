@@ -19,7 +19,7 @@ exports.createBooking = async (req, res) => {
             
             for (let i = 0; i < sessionsToCreate; i++) {
                 bookings.push({
-                    patientId: req.user.id,
+                    patientId: req.user.profileId,
                     nurseId,
                     careDetails,
                     schedule: { ...schedule, startDate: new Date(currentStartDate) },
@@ -48,7 +48,7 @@ exports.createBooking = async (req, res) => {
             return res.status(201).json(createdBookings);
         } else {
             const booking = await Booking.create({
-                patientId: req.user.id,
+                patientId: req.user.profileId,
                 nurseId,
                 careDetails,
                 schedule,
@@ -79,8 +79,8 @@ exports.createBooking = async (req, res) => {
 exports.getMyBookings = async (req, res) => {
     try {
         let filter = {};
-        if (req.user.role === 'patient') filter.patientId = req.user.id;
-        else if (req.user.role === 'nurse') filter.nurseId = req.user.id;
+        if (req.user.role === 'patient') filter.patientId = req.user.profileId;
+        else if (req.user.role === 'nurse') filter.nurseId = req.user.profileId;
         else return res.status(403).json({ message: 'Unauthorized role' });
 
         const bookings = await Booking.find(filter)
@@ -105,12 +105,12 @@ exports.updateBookingStatus = async (req, res) => {
         if (!booking) return res.status(404).json({ message: 'Booking not found' });
         
         // Basic check: A nurse can only accept/progress their own booking
-        if (req.user.role === 'nurse' && booking.nurseId.toString() !== req.user.id) {
+        if (req.user.role === 'nurse' && booking.nurseId.toString() !== req.user.profileId) {
             return res.status(403).json({ message: 'Not authorized for this booking' });
         }
 
         // Basic check: A patient can only cancel/dispute their own booking
-        if (req.user.role === 'patient' && booking.patientId.toString() !== req.user.id) {
+        if (req.user.role === 'patient' && booking.patientId.toString() !== req.user.profileId) {
             return res.status(403).json({ message: 'Not authorized for this booking' });
         }
 
@@ -141,7 +141,7 @@ exports.addVisitNote = async (req, res) => {
         const booking = await Booking.findById(req.params.id);
         if (!booking) return res.status(404).json({ message: 'Booking not found' });
 
-        if (booking.nurseId.toString() !== req.user.id) {
+        if (booking.nurseId.toString() !== req.user.profileId) {
             return res.status(403).json({ message: 'Not authorized' });
         }
 

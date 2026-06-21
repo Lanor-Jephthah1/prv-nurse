@@ -1,10 +1,9 @@
 const mongoose = require('mongoose');
 
 const nurseSchema = new mongoose.Schema({
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     // Basic Identity & Auth
     fullName: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
     gender: { type: String, enum: ['Male', 'Female', 'Other'] },
     dob: { type: Date },
     phone: { type: String, required: true },
@@ -51,11 +50,7 @@ const nurseSchema = new mongoose.Schema({
     ratings: {
         averageRating: { type: Number, default: 0 },
         totalReviews: { type: Number, default: 0 }
-    },
-    
-    // Password Reset
-    resetPasswordToken: String,
-    resetPasswordExpire: Date
+    }
 }, { timestamps: true });
 
 nurseSchema.index({ location: '2dsphere' });

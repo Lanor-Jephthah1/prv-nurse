@@ -10,7 +10,7 @@ exports.createReview = async (req, res) => {
         const { nurseId, bookingId, rating, comment } = req.body;
 
         // Ensure booking belongs to patient and is completed
-        const booking = await Booking.findOne({ _id: bookingId, patientId: req.user.id });
+        const booking = await Booking.findOne({ _id: bookingId, patientId: req.user.profileId });
         if (!booking) {
             return res.status(404).json({ message: 'Booking not found' });
         }
@@ -27,7 +27,7 @@ exports.createReview = async (req, res) => {
         // Create review
         const review = await Review.create({
             nurseId,
-            patientId: req.user.id,
+            patientId: req.user.profileId,
             bookingId,
             rating,
             comment

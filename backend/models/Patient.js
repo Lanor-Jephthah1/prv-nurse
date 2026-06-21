@@ -1,10 +1,9 @@
 const mongoose = require('mongoose');
 
 const patientSchema = new mongoose.Schema({
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     // Identity & Auth
     fullName: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
     gender: { type: String, enum: ['Male', 'Female', 'Other'] },
     dob: { type: Date },
     phone: { type: String, required: true },
@@ -58,11 +57,7 @@ const patientSchema = new mongoose.Schema({
     },
 
     // Mobile Money Details
-    mobileMoneyNumber: { type: String },
-
-    // Password Reset
-    resetPasswordToken: String,
-    resetPasswordExpire: Date
+    mobileMoneyNumber: { type: String }
 }, { timestamps: true, toJSON: { getters: true }, toObject: { getters: true } });
 
 patientSchema.index({ location: '2dsphere' });

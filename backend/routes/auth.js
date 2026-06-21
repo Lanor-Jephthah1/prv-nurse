@@ -4,9 +4,7 @@ const {
     registerNurse, 
     registerPatient, 
     registerAdmin,
-    loginNurse, 
-    loginPatient, 
-    loginAdmin,
+    login,
     refreshToken,
     forgotPassword,
     resetPassword
@@ -18,9 +16,7 @@ router.post('/register/patient', registerPatient);
 router.post('/register/admin', registerAdmin);
 
 // Login Routes
-router.post('/login/nurse', loginNurse);
-router.post('/login/patient', loginPatient);
-router.post('/login/admin', loginAdmin);
+router.post('/login', login);
 
 // Refresh Token Route
 router.post('/refresh', refreshToken);

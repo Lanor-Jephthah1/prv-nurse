@@ -3,7 +3,7 @@ const Notification = require('../models/Notification');
 // Get User Notifications
 exports.getNotifications = async (req, res) => {
     try {
-        const notifications = await Notification.find({ recipient: req.user._id })
+        const notifications = await Notification.find({ userId: req.user.id })
             .sort({ createdAt: -1 })
             .limit(50);
         res.json(notifications);
@@ -22,7 +22,7 @@ exports.markAsRead = async (req, res) => {
         }
 
         // Ensure user owns notification
-        if (notification.recipient.toString() !== req.user._id.toString()) {
+        if (notification.userId.toString() !== req.user.id.toString()) {
             return res.status(401).json({ message: 'Not authorized' });
         }
 

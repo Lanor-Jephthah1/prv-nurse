@@ -5,7 +5,7 @@ const Patient = require('../models/Patient');
 // @access  Private (Patient only)
 exports.getProfile = async (req, res) => {
     try {
-        const patient = await Patient.findById(req.user.id).select('-password');
+        const patient = await Patient.findById(req.user.profileId).select('-password');
         if (!patient) {
             return res.status(404).json({ message: 'Patient not found' });
         }
@@ -20,7 +20,7 @@ exports.getProfile = async (req, res) => {
 // @access  Private (Patient only)
 exports.updateProfile = async (req, res) => {
     try {
-        const patient = await Patient.findById(req.user.id);
+        const patient = await Patient.findById(req.user.profileId);
         if (!patient) {
             return res.status(404).json({ message: 'Patient not found' });
         }

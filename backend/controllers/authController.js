@@ -1,5 +1,7 @@
+const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const User = require('../models/User');
 const Nurse = require('../models/Nurse');
 const Patient = require('../models/Patient');
 const Admin = require('../models/Admin');
@@ -7,9 +9,9 @@ const crypto = require('crypto');
 const sendEmail = require('../utils/sendEmail');
 
 // Generate Access and Refresh Tokens
-const generateTokens = (id, role) => {
-    const accessToken = jwt.sign({ id, role }, process.env.JWT_SECRET, { expiresIn: '1h' });
-    const refreshToken = jwt.sign({ id, role }, process.env.JWT_SECRET, { expiresIn: '7d' });
+const generateTokens = (id, role, profileId) => {
+    const accessToken = jwt.sign({ id, role, profileId }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const refreshToken = jwt.sign({ id, role, profileId }, process.env.JWT_SECRET, { expiresIn: '7d' });
     return { accessToken, refreshToken };
 };
 
@@ -17,59 +19,89 @@ const generateTokens = (id, role) => {
 const registerUser = async (req, res, role) => {
     const { fullName, email, password, phone } = req.body;
     
+    // Start session for transaction
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
     try {
-        let Model = role === 'nurse' ? Nurse : (role === 'patient' ? Patient : Admin);
-        
         // Check if user already exists
-        const userExists = await Model.findOne({ email });
+        const userExists = await User.findOne({ email }).session(session);
         if (userExists) {
+            await session.abortTransaction();
+            session.endSession();
             return res.status(400).json({ message: 'User already exists with this email' });
         }
 
-        // Hash password with bcrypt work factor of 12 (as per thesis)
+        // Hash password with bcrypt work factor of 12
         const salt = await bcrypt.genSalt(12);
         const hashedPassword = await bcrypt.hash(password, salt);
 
         // Create user
-        const user = await Model.create({
-            fullName,
+        const user = new User({
             email,
             password: hashedPassword,
-            phone
+            role
         });
+        await user.save({ session });
 
-        const tokens = generateTokens(user._id, role);
+        // Create specific profile
+        let profile;
+        if (role === 'nurse') {
+            profile = new Nurse({ userId: user._id, fullName, phone });
+        } else if (role === 'patient') {
+            profile = new Patient({ userId: user._id, fullName, phone });
+        } else if (role === 'admin') {
+            profile = new Admin({ userId: user._id, fullName });
+        }
+        await profile.save({ session });
+
+        await session.commitTransaction();
+        session.endSession();
+
+        const tokens = generateTokens(user._id, role, profile._id);
         res.status(201).json({
             _id: user._id,
-            fullName: user.fullName,
+            profileId: profile._id,
+            fullName: profile.fullName,
             email: user.email,
             role,
+            status: profile.status || 'Active', // Nurses have status
             accessToken: tokens.accessToken,
             refreshToken: tokens.refreshToken
         });
     } catch (error) {
+        await session.abortTransaction();
+        session.endSession();
         res.status(500).json({ message: 'Server error during registration', error: error.message });
     }
 };
 
-// Generic Login Handler
-const loginUser = async (req, res, role) => {
+// Consolidated Login Handler
+exports.login = async (req, res) => {
     const { email, password } = req.body;
 
     try {
-        let Model = role === 'nurse' ? Nurse : (role === 'patient' ? Patient : Admin);
-        
         // Find user by email
-        const user = await Model.findOne({ email });
+        const user = await User.findOne({ email });
         
         // Compare passwords
         if (user && (await bcrypt.compare(password, user.password))) {
-            const tokens = generateTokens(user._id, role);
+            // Get profile depending on role
+            let profile;
+            if (user.role === 'nurse') profile = await Nurse.findOne({ userId: user._id });
+            else if (user.role === 'patient') profile = await Patient.findOne({ userId: user._id });
+            else if (user.role === 'admin') profile = await Admin.findOne({ userId: user._id });
+
+            const tokens = generateTokens(user._id, user.role, profile ? profile._id : null);
+            
             res.json({
                 _id: user._id,
-                fullName: user.fullName,
+                profileId: profile ? profile._id : null,
+                fullName: profile ? profile.fullName : '',
                 email: user.email,
-                role,
+                role: user.role,
+                status: profile ? profile.status : 'Active',
+                onboardingComplete: profile && profile.status ? profile.status !== 'Pending' : true,
                 accessToken: tokens.accessToken,
                 refreshToken: tokens.refreshToken
             });
@@ -81,14 +113,10 @@ const loginUser = async (req, res, role) => {
     }
 };
 
-// Exported Handlers
+// Exported Registration Handlers
 exports.registerNurse = (req, res) => registerUser(req, res, 'nurse');
 exports.registerPatient = (req, res) => registerUser(req, res, 'patient');
 exports.registerAdmin = (req, res) => registerUser(req, res, 'admin');
-
-exports.loginNurse = (req, res) => loginUser(req, res, 'nurse');
-exports.loginPatient = (req, res) => loginUser(req, res, 'patient');
-exports.loginAdmin = (req, res) => loginUser(req, res, 'admin');
 
 // Refresh Token Handler
 exports.refreshToken = async (req, res) => {
@@ -97,7 +125,7 @@ exports.refreshToken = async (req, res) => {
 
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const tokens = generateTokens(decoded.id, decoded.role);
+        const tokens = generateTokens(decoded.id, decoded.role, decoded.profileId);
         res.json(tokens);
     } catch (error) {
         res.status(403).json({ message: 'Invalid or expired refresh token' });
@@ -106,12 +134,11 @@ exports.refreshToken = async (req, res) => {
 
 // Forgot Password
 exports.forgotPassword = async (req, res) => {
-    const { email, role } = req.body;
-    if (!email || !role) return res.status(400).json({ message: 'Please provide email and role (patient/nurse/admin)' });
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ message: 'Please provide an email' });
 
     try {
-        let Model = role === 'nurse' ? Nurse : (role === 'patient' ? Patient : Admin);
-        const user = await Model.findOne({ email });
+        const user = await User.findOne({ email });
 
         if (!user) {
             return res.status(404).json({ message: 'There is no user with that email' });
@@ -128,7 +155,7 @@ exports.forgotPassword = async (req, res) => {
         await user.save({ validateBeforeSave: false });
 
         // Create reset url (frontend URL)
-        const resetUrl = `http://localhost:3000/reset-password/${resetToken}`;
+        const resetUrl = `http://localhost:3000/reset-password?token=${resetToken}&role=${user.role}`;
         const message = `You are receiving this email because you (or someone else) has requested the reset of a password. Please make a PUT request to: \n\n ${resetUrl}`;
 
         await sendEmail({
@@ -139,8 +166,7 @@ exports.forgotPassword = async (req, res) => {
 
         res.status(200).json({ message: 'Email sent' });
     } catch (error) {
-        let Model = req.body.role === 'nurse' ? Nurse : (req.body.role === 'patient' ? Patient : Admin);
-        const user = await Model.findOne({ email: req.body.email });
+        const user = await User.findOne({ email: req.body.email });
         if (user) {
             user.resetPasswordToken = undefined;
             user.resetPasswordExpire = undefined;
@@ -152,15 +178,13 @@ exports.forgotPassword = async (req, res) => {
 
 // Reset Password
 exports.resetPassword = async (req, res) => {
-    const { token, role, password } = req.body;
+    const { token, password } = req.body;
     
     try {
         // Get hashed token
         const resetPasswordToken = crypto.createHash('sha256').update(token).digest('hex');
         
-        let Model = role === 'nurse' ? Nurse : (role === 'patient' ? Patient : Admin);
-        
-        const user = await Model.findOne({
+        const user = await User.findOne({
             resetPasswordToken,
             resetPasswordExpire: { $gt: Date.now() }
         });
