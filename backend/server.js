@@ -49,13 +49,9 @@ app.use(express.json());
 app.use(cors());
 app.use(morgan('dev'));
 
-// Database Connection
-mongoose.connect(process.env.MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-})
-.then(() => console.log('MongoDB Connected successfully'))
-.catch(err => console.error('MongoDB Connection Error:', err));
+// Database Connection Middleware for Serverless
+const dbMiddleware = require('./middleware/db');
+app.use('/api', dbMiddleware);
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
@@ -77,6 +73,8 @@ app.get('/', (req, res) => {
 app.get('/api/health', (req, res) => {
     res.json({ status: 'Platform is running smoothly' });
 });
+
+
 
 const PORT = process.env.PORT || 5000;
 if (process.env.NODE_ENV !== 'production') {

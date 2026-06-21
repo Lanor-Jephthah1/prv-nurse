@@ -1,5 +1,7 @@
 const Booking = require('../models/Booking');
 const Notification = require('../models/Notification');
+const Nurse = require('../models/Nurse');
+const Patient = require('../models/Patient');
 
 // @desc    Create a new booking request (Handles Recurring Bookings)
 // @route   POST /api/bookings
@@ -7,6 +9,12 @@ const Notification = require('../models/Notification');
 exports.createBooking = async (req, res) => {
     try {
         const { nurseId, careDetails, schedule, agreedRate, totalAmount } = req.body;
+        
+        // Find the nurse profile to get the userId for notification
+        const nurse = await Nurse.findById(nurseId);
+        if (!nurse) {
+            return res.status(404).json({ message: 'Nurse not found' });
+        }
         
         if (schedule && schedule.frequency && schedule.frequency !== 'Once') {
             const mongoose = require('mongoose');
@@ -38,7 +46,7 @@ exports.createBooking = async (req, res) => {
 
             // Notify Nurse
             await Notification.create({
-                recipient: nurseId,
+                userId: nurse.userId,
                 title: 'New Booking Request',
                 message: `You have a new recurring booking request for ${sessionsToCreate} sessions.`,
                 type: 'Booking',
@@ -59,7 +67,7 @@ exports.createBooking = async (req, res) => {
 
             // Notify Nurse
             await Notification.create({
-                recipient: nurseId,
+                userId: nurse.userId,
                 title: 'New Booking Request',
                 message: `You have a new booking request.`,
                 type: 'Booking',
@@ -118,14 +126,24 @@ exports.updateBookingStatus = async (req, res) => {
         const updatedBooking = await booking.save();
         
         // Notify the OTHER party
-        const recipientId = req.user.role === 'nurse' ? booking.patientId : booking.nurseId;
-        await Notification.create({
-            recipient: recipientId,
-            title: `Booking Status Updated`,
-            message: `Booking status changed to ${status}.`,
-            type: 'Booking',
-            link: `/bookings/${booking._id}`
-        });
+        let recipientUserId;
+        if (req.user.role === 'nurse') {
+            const patient = await Patient.findById(booking.patientId);
+            recipientUserId = patient ? patient.userId : null;
+        } else {
+            const nurse = await Nurse.findById(booking.nurseId);
+            recipientUserId = nurse ? nurse.userId : null;
+        }
+
+        if (recipientUserId) {
+            await Notification.create({
+                userId: recipientUserId,
+                title: `Booking Status Updated`,
+                message: `Booking status changed to ${status}.`,
+                type: 'Booking',
+                link: `/bookings/${booking._id}`
+            });
+        }
 
         res.json(updatedBooking);
     } catch (error) {
