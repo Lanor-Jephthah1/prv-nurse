@@ -106,9 +106,18 @@ exports.login = async (req, res) => {
         if (user && (await bcrypt.compare(password, user.password))) {
             // Get profile depending on role
             let profile;
-            if (user.role === 'nurse') profile = await Nurse.findOne({ userId: user._id });
-            else if (user.role === 'patient') profile = await Patient.findOne({ userId: user._id });
-            else if (user.role === 'admin') profile = await Admin.findOne({ userId: user._id });
+            if (user.role === 'nurse') {
+                profile = await Nurse.findOne({ userId: user._id });
+                if (!profile) profile = await Nurse.create({ userId: user._id, fullName: user.fullName || 'Legacy Nurse', phone: user.phone || '' });
+            }
+            else if (user.role === 'patient') {
+                profile = await Patient.findOne({ userId: user._id });
+                if (!profile) profile = await Patient.create({ userId: user._id, fullName: user.fullName || 'Legacy Patient', phone: user.phone || '' });
+            }
+            else if (user.role === 'admin') {
+                profile = await Admin.findOne({ userId: user._id });
+                if (!profile) profile = await Admin.create({ userId: user._id, fullName: user.fullName || 'Legacy Admin' });
+            }
 
             const tokens = generateTokens(user._id, user.role, profile ? profile._id : null);
             
