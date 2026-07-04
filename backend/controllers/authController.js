@@ -36,11 +36,15 @@ const registerUser = async (req, res, role) => {
         const salt = await bcrypt.genSalt(12);
         const hashedPassword = await bcrypt.hash(password, salt);
 
+        // Generate email verification token
+        const verificationToken = crypto.randomBytes(20).toString('hex');
+
         // Create user
         const user = new User({
             email,
             password: hashedPassword,
-            role
+            role,
+            emailVerificationToken: crypto.createHash('sha256').update(verificationToken).digest('hex')
         });
         await user.save({ session });
 
@@ -57,6 +61,20 @@ const registerUser = async (req, res, role) => {
 
         await session.commitTransaction();
         session.endSession();
+
+        // Send verification email
+        const verificationUrl = `${req.protocol}://${req.get('host')}/api/auth/verify-email/${verificationToken}`;
+        const message = `Welcome to PRN Nurse Platform! Please verify your email by making a GET request to: \n\n ${verificationUrl}`;
+        
+        try {
+            await sendEmail({
+                email: user.email,
+                subject: 'Email Verification',
+                message
+            });
+        } catch (err) {
+            console.error('Email could not be sent', err);
+        }
 
         const tokens = generateTokens(user._id, role, profile._id);
         res.status(201).json({
@@ -203,5 +221,26 @@ exports.resetPassword = async (req, res) => {
         res.status(200).json({ message: 'Password reset successful' });
     } catch (error) {
         res.status(500).json({ message: 'Server error during password reset', error: error.message });
+    }
+};
+
+// Verify Email
+exports.verifyEmail = async (req, res) => {
+    try {
+        const emailVerificationToken = crypto.createHash('sha256').update(req.params.token).digest('hex');
+        
+        const user = await User.findOne({ emailVerificationToken });
+        
+        if (!user) {
+            return res.status(400).json({ message: 'Invalid token' });
+        }
+        
+        user.emailVerified = true;
+        user.emailVerificationToken = undefined;
+        await user.save();
+        
+        res.status(200).json({ message: 'Email verified successfully' });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error during email verification', error: error.message });
     }
 };

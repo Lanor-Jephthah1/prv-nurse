@@ -7,7 +7,8 @@ const {
     login,
     refreshToken,
     forgotPassword,
-    resetPassword
+    resetPassword,
+    verifyEmail
 } = require('../controllers/authController');
 
 // Registration Routes
@@ -24,5 +25,8 @@ router.post('/refresh', refreshToken);
 // Password Reset Routes
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPassword);
+
+// Email Verification Route
+router.get('/verify-email/:token', verifyEmail);
 
 module.exports = router;

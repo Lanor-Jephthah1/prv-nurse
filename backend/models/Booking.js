@@ -8,6 +8,7 @@ const bookingSchema = new mongoose.Schema({
         enum: ['Requested', 'Accepted', 'In Progress', 'Completed', 'Cancelled', 'Disputed'],
         default: 'Requested'
     },
+    matchedAt: { type: Date },
     
     // The specific details of the care request
     careDetails: {
@@ -44,5 +45,10 @@ const bookingSchema = new mongoose.Schema({
     totalAmount: { type: Number, required: true }
 
 }, { timestamps: true });
+
+// Add indexes to improve query performance on large datasets
+bookingSchema.index({ nurseId: 1, status: 1 });
+bookingSchema.index({ patientId: 1, status: 1 });
+bookingSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.model('Booking', bookingSchema);
