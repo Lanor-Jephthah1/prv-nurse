@@ -18,11 +18,13 @@ const {
     getAuditLogs,
     getActiveEmergencies,
     escalateEmergency,
-    forceSyncUsers
+    forceSyncUsers,
+    initDb
 } = require('../controllers/adminController');
 
 // 0. Database Maintenance
 router.post('/force-sync', forceSyncUsers);
+router.post('/init-db', initDb);
 
 // 1. Dashboard & Metrics
 router.get('/metrics', protect(['admin']), getDashboardMetrics);
