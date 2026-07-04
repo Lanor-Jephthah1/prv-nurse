@@ -321,3 +321,35 @@ exports.escalateEmergency = async (req, res) => {
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 };
+
+// ==========================================
+// 8. MASTER SYNC (TEMPORARY MIGRATION)
+// ==========================================
+const User = require('../models/User');
+
+exports.forceSyncUsers = async (req, res) => {
+    try {
+        const users = await User.find();
+        let migrated = { nurses: 0, patients: 0, admins: 0 };
+        
+        for (const user of users) {
+            if (user.role === 'nurse') {
+                const exists = await Nurse.findOne({ userId: user._id });
+                if (!exists) {
+                    await Nurse.create({ userId: user._id, fullName: user.fullName || 'Legacy Nurse', phone: user.phone || '', status: 'Pending' });
+                    migrated.nurses++;
+                }
+            } else if (user.role === 'patient') {
+                const exists = await Patient.findOne({ userId: user._id });
+                if (!exists) {
+                    await Patient.create({ userId: user._id, fullName: user.fullName || 'Legacy Patient', phone: user.phone || '' });
+                    migrated.patients++;
+                }
+            }
+        }
+        
+        res.json({ message: 'Legacy users fully synced to new architecture!', migrated });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error during sync', error: error.message });
+    }
+};
