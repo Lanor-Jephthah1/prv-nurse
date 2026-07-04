@@ -113,7 +113,11 @@ exports.getHeatmap = async (req, res) => {
 exports.getPendingVerifications = async (req, res) => {
     try {
         const pendingNurses = await Nurse.find({ 
-            status: { $in: ['Pending', 'Docs Verified', 'Background Cleared'] } 
+            $or: [
+                { status: { $in: ['Pending', 'Docs Verified', 'Background Cleared'] } },
+                { status: { $exists: false } },
+                { status: null }
+            ]
         }).select('fullName email phone nationalId idPhotoUrl qualifications licenseNumber status');
         
         res.json(pendingNurses);
