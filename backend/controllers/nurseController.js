@@ -1,5 +1,17 @@
 const Nurse = require('../models/Nurse');
+const User = require('../models/User');
 
+const flattenObject = (obj, prefix = '') => {
+    return Object.keys(obj).reduce((acc, k) => {
+        const pre = prefix.length ? prefix + '.' : '';
+        if (typeof obj[k] === 'object' && obj[k] !== null && !Array.isArray(obj[k]) && !(obj[k] instanceof Date)) {
+            Object.assign(acc, flattenObject(obj[k], pre + k));
+        } else {
+            acc[pre + k] = obj[k];
+        }
+        return acc;
+    }, {});
+};
 // @desc    Get current nurse profile
 // @route   GET /api/nurses/profile
 // @access  Private (Nurse only)
@@ -20,43 +32,45 @@ exports.getProfile = async (req, res) => {
 // @access  Private (Nurse only)
 exports.updateProfile = async (req, res) => {
     try {
-        const nurse = await Nurse.findById(req.user.profileId);
-        if (!nurse) {
+        const allowedFields = [
+            'fullName', 'email', 'gender', 'dob', 'phone', 'profilePhoto', 'photoUrl',
+            'nationalId', 'idPhotoUrl', 'address', 'documents',
+            'highestQualification', 'graduationYear', 'institution', 'licensingBody', 'certificateUrls',
+            'qualifications', 'licenseNumber', 'licenseExpiry', 'certifications',
+            'experienceYears', 'specializations', 'skills', 'equipment', 'workHistory',
+            'willingToTravel', 'travelDistance', 'bio',
+            'availability', 'location', 'pricing',
+            'onboardingStep', 'onboardingComplete', 'isDraft'
+        ];
+
+        const filteredBody = {};
+        for (const key of allowedFields) {
+            if (req.body[key] !== undefined) {
+                filteredBody[key] = req.body[key];
+            }
+        }
+
+        const flatData = flattenObject(filteredBody);
+
+        const updatedNurse = await Nurse.findByIdAndUpdate(
+            req.user.profileId, 
+            { $set: flatData }, 
+            { new: true, runValidators: true }
+        );
+
+        if (!updatedNurse) {
             return res.status(404).json({ message: 'Nurse not found' });
         }
 
-        // List of allowed fields to update
-        const { 
-            phone, address, nationalId, 
-            qualifications, licenseNumber, certifications, 
-            experienceYears, specializations, skills, 
-            availability, pricing, location 
-        } = req.body;
-
-        // Update fields if they exist in request body
-        if (phone) nurse.phone = phone;
-        if (address) nurse.address = address;
-        if (nationalId) nurse.nationalId = nationalId;
-        if (qualifications) nurse.qualifications = qualifications;
-        if (licenseNumber) nurse.licenseNumber = licenseNumber;
-        if (certifications) nurse.certifications = certifications;
-        if (experienceYears) nurse.experienceYears = experienceYears;
-        if (specializations) nurse.specializations = specializations;
-        if (skills) nurse.skills = skills;
-        if (availability) nurse.availability = availability;
-        if (pricing) nurse.pricing = pricing;
-        
-        // Location must be GeoJSON Point [lng, lat]
-        if (location && location.coordinates) {
-            nurse.location = {
-                type: 'Point',
-                coordinates: location.coordinates
-            };
+        // Sync auth model if needed
+        if (filteredBody.fullName || filteredBody.email || filteredBody.phone) {
+            const userUpdates = {};
+            if (filteredBody.fullName) userUpdates.fullName = filteredBody.fullName;
+            if (filteredBody.email) userUpdates.email = filteredBody.email;
+            if (filteredBody.phone) userUpdates.phone = filteredBody.phone;
+            await User.findByIdAndUpdate(req.user.id, { $set: userUpdates });
         }
 
-        const updatedNurse = await nurse.save();
-        
-        // Don't send password back
         const nurseResponse = updatedNurse.toObject();
         delete nurseResponse.password;
 
