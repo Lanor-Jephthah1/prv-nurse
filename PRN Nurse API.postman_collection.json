@@ -472,6 +472,249 @@
                                       "response":  [
 
                                                    ]
+                                  },
+                                  {
+                                      "name":  "Onboarding Step 1 (Identity)",
+                                      "request":  {
+                                                      "body":  {
+                                                                   "raw":  "{\n  \"fullName\": \"Dave Mensah\",\n  \"gender\": \"male\",\n  \"dob\": \"1995-05-15\",\n  \"phone\": \"+233257638382\",\n  \"email\": \"test@gmail.com\",\n  \"profilePhoto\": \"https://storage.example.com/uploads/photo.jpg\",\n  \"onboardingStep\": 1,\n  \"isDraft\": false\n}",
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "method":  "PUT",
+                                                      "url":  {
+                                                                  "host":  [
+                                                                               "{{base_url}}"
+                                                                           ],
+                                                                  "raw":  "{{base_url}}/api/nurses/profile",
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "nurses",
+                                                                               "profile"
+                                                                           ]
+                                                              },
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{jwt_token}}"
+                                                                     }
+                                                                 ]
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Onboarding Step 2 (Documents)",
+                                      "request":  {
+                                                      "body":  {
+                                                                   "raw":  "{\n  \"documents\": {\n    \"nationalIdUrl\": \"https://storage.example.com/uploads/national_id.pdf\",\n    \"passportPhotoUrl\": \"https://storage.example.com/uploads/passport_photo.jpg\",\n    \"addressProofUrl\": \"https://storage.example.com/uploads/utility_bill.pdf\"\n  },\n  \"onboardingStep\": 2\n}",
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "method":  "PUT",
+                                                      "url":  {
+                                                                  "host":  [
+                                                                               "{{base_url}}"
+                                                                           ],
+                                                                  "raw":  "{{base_url}}/api/nurses/profile",
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "nurses",
+                                                                               "profile"
+                                                                           ]
+                                                              },
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{jwt_token}}"
+                                                                     }
+                                                                 ]
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Onboarding Step 3 (Qualifications)",
+                                      "request":  {
+                                                      "body":  {
+                                                                   "raw":  "{\n  \"highestQualification\": \"BSc Nursing\",\n  \"graduationYear\": \"2020\",\n  \"institution\": \"University of Ghana\",\n  \"licenseNumber\": \"2342343423423\",\n  \"licenseExpiry\": \"2028-12-31\",\n  \"licensingBody\": \"NMC Ghana\",\n  \"certifications\": [\"BLS (Basic Life Support)\", \"ACLS\"],\n  \"certificateUrls\": [\"https://storage.example.com/uploads/cert1.pdf\"],\n  \"onboardingStep\": 3\n}",
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "method":  "PUT",
+                                                      "url":  {
+                                                                  "host":  [
+                                                                               "{{base_url}}"
+                                                                           ],
+                                                                  "raw":  "{{base_url}}/api/nurses/profile",
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "nurses",
+                                                                               "profile"
+                                                                           ]
+                                                              },
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{jwt_token}}"
+                                                                     }
+                                                                 ]
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Onboarding Step 4 (Experience)",
+                                      "request":  {
+                                                      "body":  {
+                                                                   "raw":  "{\n  \"experienceYears\": 5,\n  \"specializations\": [\"Wound Care\", \"Elderly Care \u0026 Geriatrics\"],\n  \"workHistory\": [\n    {\n      \"title\": \"Senior Staff Nurse\",\n      \"facility\": \"Korle Bu Teaching Hospital\",\n      \"duration\": \"2020 - Present\"\n    }\n  ],\n  \"onboardingStep\": 4\n}",
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "method":  "PUT",
+                                                      "url":  {
+                                                                  "host":  [
+                                                                               "{{base_url}}"
+                                                                           ],
+                                                                  "raw":  "{{base_url}}/api/nurses/profile",
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "nurses",
+                                                                               "profile"
+                                                                           ]
+                                                              },
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{jwt_token}}"
+                                                                     }
+                                                                 ]
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Onboarding Step 5 (Skills \u0026 Equipment)",
+                                      "request":  {
+                                                      "body":  {
+                                                                   "raw":  "{\n  \"skills\": [\"Medication Admin\", \"Wound Dressing\", \"Vitals Monitoring\", \"Communication\"],\n  \"equipment\": [\"ventilator\", \"ecg_monitor\", \"infusion_pump\"],\n  \"onboardingStep\": 5\n}",
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "method":  "PUT",
+                                                      "url":  {
+                                                                  "host":  [
+                                                                               "{{base_url}}"
+                                                                           ],
+                                                                  "raw":  "{{base_url}}/api/nurses/profile",
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "nurses",
+                                                                               "profile"
+                                                                           ]
+                                                              },
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{jwt_token}}"
+                                                                     }
+                                                                 ]
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Onboarding Step 6 (Location)",
+                                      "request":  {
+                                                      "body":  {
+                                                                   "raw":  "{\n  \"location\": {\n    \"address\": \"East Legon, Accra\"\n  },\n  \"willingToTravel\": true,\n  \"travelDistance\": 25,\n  \"onboardingStep\": 6\n}",
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "method":  "PUT",
+                                                      "url":  {
+                                                                  "host":  [
+                                                                               "{{base_url}}"
+                                                                           ],
+                                                                  "raw":  "{{base_url}}/api/nurses/profile",
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "nurses",
+                                                                               "profile"
+                                                                           ]
+                                                              },
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{jwt_token}}"
+                                                                     }
+                                                                 ]
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Onboarding Step 7 (Availability)",
+                                      "request":  {
+                                                      "body":  {
+                                                                   "raw":  "{\n  \"days\": [\"Mon\", \"Wed\", \"Fri\", \"Sat\"],\n  \"timeSlots\": [\"morning\", \"afternoon\"],\n  \"emergencyAvailable\": true\n}",
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "method":  "PUT",
+                                                      "url":  {
+                                                                  "host":  [
+                                                                               "{{base_url}}"
+                                                                           ],
+                                                                  "raw":  "{{base_url}}/api/nurses/availability",
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "nurses",
+                                                                               "availability"
+                                                                           ]
+                                                              },
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{jwt_token}}"
+                                                                     }
+                                                                 ]
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Onboarding Step 8 (Pricing)",
+                                      "request":  {
+                                                      "body":  {
+                                                                   "raw":  "{\n  \"pricing\": {\n    \"hourlyRate\": 150,\n    \"dailyRate\": 800,\n    \"weeklyRate\": 4000,\n    \"emergencyRate\": 250,\n    \"currency\": \"GHS\"\n  },\n  \"onboardingStep\": 8\n}",
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "method":  "PUT",
+                                                      "url":  {
+                                                                  "host":  [
+                                                                               "{{base_url}}"
+                                                                           ],
+                                                                  "raw":  "{{base_url}}/api/nurses/profile",
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "nurses",
+                                                                               "profile"
+                                                                           ]
+                                                              },
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{jwt_token}}"
+                                                                     }
+                                                                 ]
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Onboarding Step 9 (Bio \u0026 Submit)",
+                                      "request":  {
+                                                      "body":  {
+                                                                   "raw":  "{\n  \"bio\": \"Passionate registered nurse with 5 years of clinical experience specializing in home healthcare and post-operative recovery...\",\n  \"onboardingComplete\": true,\n  \"onboardingStep\": 9\n}",
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "method":  "PUT",
+                                                      "url":  {
+                                                                  "host":  [
+                                                                               "{{base_url}}"
+                                                                           ],
+                                                                  "raw":  "{{base_url}}/api/nurses/profile",
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "nurses",
+                                                                               "profile"
+                                                                           ]
+                                                              },
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{jwt_token}}"
+                                                                     }
+                                                                 ]
+                                                  }
                                   }
                               ]
                  },
