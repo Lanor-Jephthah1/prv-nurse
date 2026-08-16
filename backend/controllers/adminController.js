@@ -51,7 +51,16 @@ exports.getDashboardMetrics = async (req, res) => {
         // Open Disputes
         const openDisputes = await Incident.countDocuments({ type: 'Dispute', status: 'Open' });
 
+        // Format specifically as requested by frontend: 
+        // total patients, total nurses, total active nurses, pending reviews, total bookings
         res.json({
+            totalPatients: totalPatients,
+            totalNurses: totalNurses + pendingNurses,
+            activeNurses: totalNurses,
+            pendingReviews: pendingNurses, // Pending nurses represent pending verification reviews
+            totalBookings: totalBookings,
+            
+            // Legacy / Extra fields kept for backward compatibility
             nurses: { active: totalNurses, pending: pendingNurses },
             patients: { total: totalPatients },
             bookings: { active: activeBookings, today: todaysBookings, total: totalBookings },
@@ -376,5 +385,41 @@ exports.initDb = async (req, res) => {
         res.json({ message: 'Database collections forcefully initialized and visible in Compass!' });
     } catch (error) {
         res.status(500).json({ message: 'Server error during init', error: error.message });
+    }
+};
+
+// ==========================================
+// 10. USER DELETION
+// ==========================================
+
+exports.deleteNurse = async (req, res) => {
+    try {
+        const nurse = await Nurse.findById(req.params.id);
+        if (!nurse) return res.status(404).json({ message: 'Nurse not found' });
+        
+        await Nurse.findByIdAndDelete(req.params.id);
+        // Also delete their auth User record
+        if (nurse.userId) await User.findByIdAndDelete(nurse.userId);
+        
+        await createAuditLog(req.user.id, 'DELETE_USER', 'Nurse', req.params.id, { reason: 'Deleted by Admin' });
+        res.json({ message: 'Nurse profile and account successfully deleted.' });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error deleting nurse', error: error.message });
+    }
+};
+
+exports.deletePatient = async (req, res) => {
+    try {
+        const patient = await Patient.findById(req.params.id);
+        if (!patient) return res.status(404).json({ message: 'Patient not found' });
+        
+        await Patient.findByIdAndDelete(req.params.id);
+        // Also delete their auth User record
+        if (patient.userId) await User.findByIdAndDelete(patient.userId);
+        
+        await createAuditLog(req.user.id, 'DELETE_USER', 'Patient', req.params.id, { reason: 'Deleted by Admin' });
+        res.json({ message: 'Patient profile and account successfully deleted.' });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error deleting patient', error: error.message });
     }
 };

@@ -7,8 +7,8 @@ exports.getRecommendations = async (req, res) => {
     try {
         const { requiredTasks, location, schedule, primaryCondition, preferredGender, maxBudget } = req.body;
         
-        if (!location || !location.coordinates || !schedule) {
-            return res.status(400).json({ message: 'Missing location or schedule details' });
+        if (!location || !location.coordinates || !schedule || !Array.isArray(schedule.days) || !Array.isArray(schedule.timeSlots)) {
+            return res.status(400).json({ message: 'Missing or invalid location or schedule details. Ensure coordinates and schedule (with days/timeSlots arrays) are provided.' });
         }
 
         // --- STAGE 1: CANDIDATE GENERATION (MongoDB filtering) ---
@@ -103,14 +103,28 @@ exports.getRecommendations = async (req, res) => {
         } catch (mlError) {
             console.error('ML service request failed, falling back to database sorting:', mlError);
             
-            // Fallback: If ML service is down, sort candidates basic-style by distance
+            // Fallback: If ML service is down, score candidates basic-style by matching skills and preferences
+            const recommendations = candidates.map(nurse => {
+                let score = 0.5;
+                // Add score for matching required tasks
+                if (requiredTasks && requiredTasks.length > 0) {
+                    const matchCount = requiredTasks.filter(task => nurse.skills && nurse.skills.includes(task)).length;
+                    score += (matchCount / requiredTasks.length) * 0.3; // Boost score up to +0.3
+                }
+                // Add score for preferred gender
+                if (preferredGender && preferredGender !== 'None' && nurse.gender === preferredGender) {
+                    score += 0.1; // Boost score by +0.1
+                }
+                return {
+                    nurse,
+                    score: Math.min(score, 1.0), // Cap at 1.0
+                    features: { basicFallbackMatch: true }
+                };
+            }).sort((a, b) => b.score - a.score);
+
             res.json({
                 message: "Fallback results (ML ranking engine unavailable)",
-                recommendations: candidates.map(nurse => ({
-                    nurse,
-                    score: 0.5, // flat score
-                    features: {}
-                }))
+                recommendations
             });
         }
 

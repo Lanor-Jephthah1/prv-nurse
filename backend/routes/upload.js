@@ -6,16 +6,24 @@ const { protect } = require('../middleware/authMiddleware');
 // @route   POST /api/upload
 // @access  Private (Nurse only)
 router.post('/', protect(['nurse']), (req, res) => {
-    // Generate a mock S3 url
-    const mockFilename = `doc-${Date.now()}.pdf`;
-    const mockS3Url = `https://prv-nurse-bucket.s3.amazonaws.com/credentials/${mockFilename}`;
+    const { type } = req.query;
     
-    console.log(`[AWS S3 Mock] Uploading credentials file for nurse ${req.user.id}`);
+    // By default, return a valid placeholder image URL so frontend <img> tags don't break
+    let mockFilename = `photo-${Date.now()}.jpg`;
+    let mockUrl = `https://ui-avatars.com/api/?name=Nurse&background=random&size=200`;
+    
+    // If explicitly requesting a document type
+    if (type === 'document' || type === 'pdf') {
+        mockFilename = `doc-${Date.now()}.pdf`;
+        mockUrl = `https://prv-nurse-bucket.s3.amazonaws.com/credentials/${mockFilename}`;
+    }
+    
+    console.log(`[AWS S3 Mock] Uploading file for nurse ${req.user.id}, returning mock URL`);
     
     res.status(201).json({
-        message: 'File uploaded successfully (Mock S3)',
+        message: 'File uploaded successfully (Mock)',
         fileName: mockFilename,
-        fileUrl: mockS3Url
+        fileUrl: mockUrl
     });
 });
 // @desc    Get secure signed URL for S3 document (Mock)

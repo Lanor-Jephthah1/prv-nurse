@@ -77,7 +77,7 @@ const nurseSchema = new mongoose.Schema({
     isDraft: { type: Boolean, default: true },
     
     // Platform Status
-    status: { type: String, enum: ['Pending', 'Docs Verified', 'Background Cleared', 'Active', 'Suspended'], default: 'Pending' },
+    status: { type: String, enum: ['Pending', 'Docs Verified', 'Background Cleared', 'Active', 'Suspended', 'Rejected'], default: 'Pending' },
     ratings: {
         averageRating: { type: Number, default: 0 },
         totalReviews: { type: Number, default: 0 }

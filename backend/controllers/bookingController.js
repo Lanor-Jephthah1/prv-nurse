@@ -10,6 +10,13 @@ exports.createBooking = async (req, res) => {
     try {
         const { nurseId, careDetails, schedule, agreedRate, totalAmount } = req.body;
         
+        // Defensive checks to prevent 500 crashes from malformed frontend payloads
+        if (!nurseId || !schedule || !schedule.startDate || agreedRate === undefined || totalAmount === undefined) {
+            return res.status(400).json({ 
+                message: 'Missing required fields. Ensure nurseId, schedule (with startDate), agreedRate, and totalAmount are provided.' 
+            });
+        }
+        
         // Find the nurse profile to get the userId for notification
         const nurse = await Nurse.findById(nurseId);
         if (!nurse) {
