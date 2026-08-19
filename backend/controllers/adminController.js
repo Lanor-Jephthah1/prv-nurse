@@ -423,3 +423,13 @@ exports.deletePatient = async (req, res) => {
         res.status(500).json({ message: 'Server error deleting patient', error: error.message });
     }
 };
+
+exports.getAllPatients = async (req, res) => {
+    try {
+        const patients = await Patient.find()
+            .populate('userId', 'email role status createdAt');
+        res.json(patients);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error fetching patients', error: error.message });
+    }
+};
