@@ -56,8 +56,9 @@ router.get('/audit-logs', protect(['admin']), getAuditLogs);
 router.get('/emergencies', protect(['admin']), getActiveEmergencies);
 router.patch('/emergencies/:id/escalate', protect(['admin']), escalateEmergency);
 
-// 8. User Management (Deletion)
-const { deleteNurse, deletePatient } = require('../controllers/adminController');
+// 8. User Management (Deletion & Listing)
+const { deleteNurse, deletePatient, getAllPatients } = require('../controllers/adminController');
+router.get('/patients', protect(['admin']), getAllPatients);
 router.delete('/nurses/:id', protect(['admin']), deleteNurse);
 router.delete('/patients/:id', protect(['admin']), deletePatient);
 
