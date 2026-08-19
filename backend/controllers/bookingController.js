@@ -16,6 +16,11 @@ exports.createBooking = async (req, res) => {
                 message: 'Missing required fields. Ensure nurseId, schedule (with startDate), agreedRate, and totalAmount are provided.' 
             });
         }
+
+        // Map frontend "One-time visit" strictly to "Once" to satisfy Mongoose enum
+        if (schedule.frequency === 'One-time visit') {
+            schedule.frequency = 'Once';
+        }
         
         // Find the nurse profile to get the userId for notification
         const nurse = await Nurse.findById(nurseId);
