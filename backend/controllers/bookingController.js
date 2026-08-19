@@ -17,9 +17,11 @@ exports.createBooking = async (req, res) => {
             });
         }
 
-        // Map frontend "One-time visit" strictly to "Once" to satisfy Mongoose enum
-        if (schedule.frequency === 'One-time visit') {
-            schedule.frequency = 'Once';
+        // Map frontend "One-time visit" to "Once" securely, catching any case or typo
+        if (schedule && schedule.frequency) {
+            if (!['Daily', 'Weekly', 'Monthly'].includes(schedule.frequency)) {
+                schedule.frequency = 'Once';
+            }
         }
         
         // Find the nurse profile to get the userId for notification
