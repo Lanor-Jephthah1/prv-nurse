@@ -6,5 +6,6 @@ const { getProfile, updateProfile } = require('../controllers/patientController'
 // Protected Patient routes
 router.get('/profile', protect(['patient']), getProfile);
 router.put('/profile', protect(['patient']), updateProfile);
+router.patch('/profile', protect(['patient']), updateProfile);
 
 module.exports = router;
