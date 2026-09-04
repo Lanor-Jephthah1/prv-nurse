@@ -93,6 +93,8 @@ CLOUDINARY_API_KEY=<api_key>
 CLOUDINARY_API_SECRET=<api_secret>
 ```
 
+> **Note:** The `.env` file is explicitly ignored in the `.gitignore` to prevent secret leakage. Never commit these keys to version control.
+
 ## Deployment
 
 The application is configured for seamless deployment to **Vercel**.

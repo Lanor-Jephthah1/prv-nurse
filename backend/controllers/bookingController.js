@@ -29,6 +29,38 @@ exports.createBooking = async (req, res) => {
         if (!nurse) {
             return res.status(404).json({ message: 'Nurse not found' });
         }
+
+        // Helper to match slot names flexibly
+        const slotsMatch = (s1, s2) => {
+            if (!s1 || !s2) return false;
+            const a = s1.toLowerCase().trim();
+            const b = s2.toLowerCase().trim();
+            return a === b || a.includes(b) || b.includes(a);
+        };
+
+        // Prevent booking a slot that has already been accepted by this nurse
+        const requestedSlots = Array.isArray(schedule.timeSlots) ? schedule.timeSlots : [];
+        if (requestedSlots.length > 0) {
+            const targetDate = new Date(schedule.startDate);
+            const dayStart = new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate(), 0, 0, 0, 0));
+            const dayEnd = new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate(), 23, 59, 59, 999));
+
+            const existingAccepted = await Booking.find({
+                nurseId,
+                status: { $in: ['Accepted', 'In Progress'] },
+                'schedule.startDate': { $gte: dayStart, $lte: dayEnd }
+            }).select('schedule.timeSlots');
+
+            const allBookedSlots = existingAccepted.flatMap(b => (b.schedule && b.schedule.timeSlots) || []);
+            const conflict = requestedSlots.find(reqSlot => allBookedSlots.some(booked => slotsMatch(booked, reqSlot)));
+
+            if (conflict) {
+                return res.status(409).json({
+                    message: `This time slot (${conflict}) is already booked and accepted for this nurse on this date. Please choose another available slot.`,
+                    conflictingSlot: conflict
+                });
+            }
+        }
         
         if (schedule && schedule.frequency && schedule.frequency !== 'Once') {
             const mongoose = require('mongoose');
@@ -105,8 +137,7 @@ exports.getMyBookings = async (req, res) => {
         else if (req.user.role === 'nurse') filter.nurseId = req.user.profileId;
         else return res.status(403).json({ message: 'Unauthorized role' });
 
-        const bookings = await Booking.find(filter)
-            .populate('patientId', 'fullName phone address')
+        const bookings = await Booking.find(filter).sort({ createdAt: -1 }).populate('patientId', 'fullName phone address')
             .populate('nurseId', 'fullName phone photoUrl ratings');
             
         res.json(bookings);
@@ -136,7 +167,61 @@ exports.updateBookingStatus = async (req, res) => {
             return res.status(403).json({ message: 'Not authorized for this booking' });
         }
 
-        booking.status = status;
+        // Handle dual-approval for 'Completed' status
+        if (status === 'Completed') {
+            if (req.user.role === 'nurse') booking.completionApprovals.nurseApproved = true;
+            if (req.user.role === 'patient') booking.completionApprovals.patientApproved = true;
+
+            // Only mark as fully 'Completed' if both parties have approved
+            if (booking.completionApprovals.nurseApproved && booking.completionApprovals.patientApproved) {
+                booking.status = 'Completed';
+            } else {
+                // Return early if we are just marking approval but it's not fully completed yet.
+                // The frontend can read `booking.totalAmount` and `booking.completionApprovals` from this response.
+                await booking.save();
+                return res.json({ 
+                    message: `Approval recorded. Waiting for the other party. Total Amount: ${booking.totalAmount}`, 
+                    booking 
+                });
+            }
+        } else if (status === 'Accepted') {
+            // Check if this nurse already accepted another booking for the same date & time slot
+            const slotsMatch = (s1, s2) => {
+                if (!s1 || !s2) return false;
+                const a = s1.toLowerCase().trim();
+                const b = s2.toLowerCase().trim();
+                return a === b || a.includes(b) || b.includes(a);
+            };
+
+            const targetDate = new Date(booking.schedule.startDate);
+            const dayStart = new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate(), 0, 0, 0, 0));
+            const dayEnd = new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate(), 23, 59, 59, 999));
+
+            const existingAccepted = await Booking.find({
+                _id: { $ne: booking._id },
+                nurseId: booking.nurseId,
+                status: { $in: ['Accepted', 'In Progress'] },
+                'schedule.startDate': { $gte: dayStart, $lte: dayEnd }
+            }).select('schedule.timeSlots');
+
+            const allBookedSlots = existingAccepted.flatMap(b => (b.schedule && b.schedule.timeSlots) || []);
+            const conflict = (booking.schedule && booking.schedule.timeSlots || []).find(ts =>
+                allBookedSlots.some(booked => slotsMatch(booked, ts))
+            );
+
+            if (conflict) {
+                return res.status(409).json({
+                    message: `Conflict: You have already accepted another booking for the '${conflict}' slot on this date.`
+                });
+            }
+
+            booking.status = 'Accepted';
+            booking.matchedAt = new Date();
+        } else {
+            // For other statuses (Declined, Cancelled, In Progress), set it directly
+            booking.status = status;
+        }
+
         const updatedBooking = await booking.save();
         
         // Notify the OTHER party
@@ -185,3 +270,4 @@ exports.addVisitNote = async (req, res) => {
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 };
+

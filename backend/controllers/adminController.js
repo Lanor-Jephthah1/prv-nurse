@@ -165,8 +165,7 @@ exports.updateVerificationStatus = async (req, res) => {
 
 exports.getAllBookings = async (req, res) => {
     try {
-        const bookings = await Booking.find()
-            .populate('patientId', 'fullName phone')
+        const bookings = await Booking.find().sort({ createdAt: -1 }).populate('patientId', 'fullName phone')
             .populate('nurseId', 'fullName phone')
             .sort({ createdAt: -1 });
         res.json(bookings);
@@ -220,7 +219,7 @@ exports.flagPatient = async (req, res) => {
 
 exports.getIncidents = async (req, res) => {
     try {
-        const incidents = await Incident.find().populate('reportedBy targetUser bookingId');
+        const incidents = await Incident.find().sort({ createdAt: -1 }).populate('reportedBy targetUser bookingId');
         res.json(incidents);
     } catch (error) {
         res.status(500).json({ message: 'Server error', error: error.message });
@@ -426,10 +425,10 @@ exports.deletePatient = async (req, res) => {
 
 exports.getAllPatients = async (req, res) => {
     try {
-        const patients = await Patient.find()
-            .populate('userId', 'email role status createdAt');
+        const patients = await Patient.find().sort({ createdAt: -1 }).populate('userId', 'email role status createdAt');
         res.json(patients);
     } catch (error) {
         res.status(500).json({ message: 'Server error fetching patients', error: error.message });
     }
 };
+

@@ -2,6 +2,13 @@
 backend/node_modules/
 backend/.env
 backend/firebase-service-account.json
+backend/firebaseServiceAccountKey.json
+backend/*.json.key
+backend/seedDatabase.js
+backend/fix*.js
+backend/fillDetails.js
+backend/checkUrl.js
+backend/testSchema.js
 
 # Python
 ml-service/venv/

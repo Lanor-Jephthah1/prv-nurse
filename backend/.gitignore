@@ -1,7 +1,16 @@
 node_modules/
 .env
 firebase-service-account.json
+firebaseServiceAccountKey.json
+*.json.key
+seedDatabase.js
+fix*.js
+fillDetails.js
+checkUrl.js
+testSchema.js
 .DS_Store
 
 .vercel
 .env*
+
+.vercel

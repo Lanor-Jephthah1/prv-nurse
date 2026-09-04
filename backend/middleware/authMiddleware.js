@@ -1,8 +1,11 @@
-const jwt = require('jsonwebtoken');
+const admin = require('../config/firebase');
+const User = require('../models/User');
+const Patient = require('../models/Patient');
+const Nurse = require('../models/Nurse');
 
 // Middleware to protect routes and enforce role-based access control
 const protect = (roles = []) => {
-    return (req, res, next) => {
+    return async (req, res, next) => {
         let token;
 
         // Check if authorization header exists and starts with Bearer
@@ -11,15 +14,34 @@ const protect = (roles = []) => {
         }
 
         if (!token) {
-            return res.status(401).json({ message: 'Not authorized, no token provided' });
+            return res.status(401).json({ message: 'Not authorized, no Firebase token provided' });
         }
 
         try {
-            // Verify token
-            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            // Verify Firebase token
+            const decodedToken = await admin.auth().verifyIdToken(token);
             
-            // Attach user payload to request (contains id and role)
-            req.user = decoded;
+            // Find the MongoDB user corresponding to this Firebase UID
+            const user = await User.findOne({ firebaseUid: decodedToken.uid });
+            if (!user) {
+                return res.status(401).json({ message: 'User authenticated in Firebase but not found in Database' });
+            }
+
+            // Attach user payload to request
+            req.user = {
+                id: user._id,
+                firebaseUid: user.firebaseUid,
+                role: user.role
+            };
+
+            // Look up the specific profile ID based on role and attach it
+            if (user.role === 'patient') {
+                const profile = await Patient.findOne({ userId: user._id });
+                if (profile) req.user.profileId = profile._id.toString();
+            } else if (user.role === 'nurse') {
+                const profile = await Nurse.findOne({ userId: user._id });
+                if (profile) req.user.profileId = profile._id.toString();
+            }
             
             // Check if the user's role is allowed to access this route
             if (roles.length && !roles.includes(req.user.role)) {
@@ -28,7 +50,8 @@ const protect = (roles = []) => {
             
             next();
         } catch (error) {
-            return res.status(401).json({ message: 'Not authorized, token failed or expired' });
+            console.error('Firebase Auth Error:', error);
+            return res.status(401).json({ message: 'Not authorized, Firebase token failed or expired' });
         }
     };
 };
