@@ -1,23 +1,15 @@
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Nurse = require('../models/Nurse');
 const Patient = require('../models/Patient');
 const Admin = require('../models/Admin');
-const crypto = require('crypto');
-const sendEmail = require('../utils/sendEmail');
+const admin = require('../config/firebase');
 
-// Generate Access and Refresh Tokens
-const generateTokens = (id, role, profileId) => {
-    const accessToken = jwt.sign({ id, role, profileId }, process.env.JWT_SECRET, { expiresIn: '1h' });
-    const refreshToken = jwt.sign({ id, role, profileId }, process.env.JWT_SECRET, { expiresIn: '7d' });
-    return { accessToken, refreshToken };
-};
-
-// Generic Registration Handler
+// @desc    Register a new user after successful Firebase Auth
+// @route   POST /api/auth/register/:role (e.g., /api/auth/register/patient)
+// @access  Public
 const registerUser = async (req, res, role) => {
-    const { fullName, email, password, phone } = req.body;
+    const { email, firebaseUid, fullName, phone } = req.body;
     
     // Start session for transaction
     const session = await mongoose.startSession();
@@ -25,58 +17,35 @@ const registerUser = async (req, res, role) => {
 
     try {
         // Check if user already exists
-        const userExists = await User.findOne({ email }).session(session);
+        const userExists = await User.findOne({ firebaseUid }).session(session);
         if (userExists) {
             await session.abortTransaction();
             session.endSession();
-            return res.status(400).json({ message: 'User already exists with this email' });
+            return res.status(400).json({ message: 'User already exists in database' });
         }
 
-        // Hash password with bcrypt work factor of 12
-        const salt = await bcrypt.genSalt(12);
-        const hashedPassword = await bcrypt.hash(password, salt);
-
-        // Generate email verification token
-        const verificationToken = crypto.randomBytes(20).toString('hex');
-
-        // Create user
+        // Create user linking to Firebase UID
         const user = new User({
             email,
-            password: hashedPassword,
-            role,
-            emailVerificationToken: crypto.createHash('sha256').update(verificationToken).digest('hex')
+            firebaseUid,
+            role
         });
         await user.save({ session });
 
         // Create specific profile
         let profile;
         if (role === 'nurse') {
-            profile = new Nurse({ userId: user._id, fullName, phone });
+            profile = new Nurse({ userId: user._id, fullName, phone, email });
         } else if (role === 'patient') {
-            profile = new Patient({ userId: user._id, fullName, phone });
+            profile = new Patient({ userId: user._id, fullName, phone, email });
         } else if (role === 'admin') {
-            profile = new Admin({ userId: user._id, fullName });
+            profile = new Admin({ userId: user._id, fullName, email });
         }
         await profile.save({ session });
 
         await session.commitTransaction();
         session.endSession();
 
-        // Send verification email
-        const verificationUrl = `${req.protocol}://${req.get('host')}/api/auth/verify-email/${verificationToken}`;
-        const message = `Welcome to PRN Nurse Platform! Please verify your email by making a GET request to: \n\n ${verificationUrl}`;
-        
-        try {
-            await sendEmail({
-                email: user.email,
-                subject: 'Email Verification',
-                message
-            });
-        } catch (err) {
-            console.error('Email could not be sent', err);
-        }
-
-        const tokens = generateTokens(user._id, role, profile._id);
         res.status(201).json({
             _id: user._id,
             profileId: profile._id,
@@ -84,59 +53,43 @@ const registerUser = async (req, res, role) => {
             email: user.email,
             role,
             status: profile.status || 'Active', // Nurses have status
-            accessToken: tokens.accessToken,
-            refreshToken: tokens.refreshToken
         });
     } catch (error) {
         await session.abortTransaction();
         session.endSession();
-        res.status(500).json({ message: 'Server error during registration', error: error.message });
+        res.status(500).json({ message: 'Server error during database registration', error: error.message });
     }
 };
 
-// Consolidated Login Handler
-exports.login = async (req, res) => {
-    const { email, password } = req.body;
-
+// @desc    Fetch Profile Data after Firebase Login
+// @route   GET /api/auth/me
+// @access  Private (Requires valid Firebase Token in header)
+exports.getMe = async (req, res) => {
     try {
-        // Find user by email
-        const user = await User.findOne({ email });
-        
-        // Compare passwords
-        if (user && (await bcrypt.compare(password, user.password))) {
-            // Get profile depending on role
-            let profile;
-            if (user.role === 'nurse') {
-                profile = await Nurse.findOne({ userId: user._id });
-                if (!profile) profile = await Nurse.create({ userId: user._id, fullName: user.fullName || 'Legacy Nurse', phone: user.phone || '' });
-            }
-            else if (user.role === 'patient') {
-                profile = await Patient.findOne({ userId: user._id });
-                if (!profile) profile = await Patient.create({ userId: user._id, fullName: user.fullName || 'Legacy Patient', phone: user.phone || '' });
-            }
-            else if (user.role === 'admin') {
-                profile = await Admin.findOne({ userId: user._id });
-                if (!profile) profile = await Admin.create({ userId: user._id, fullName: user.fullName || 'Legacy Admin' });
-            }
+        // req.user is populated by the authMiddleware using the Firebase Token
+        const user = await User.findById(req.user.id);
+        if (!user) return res.status(404).json({ message: 'User not found in Database' });
 
-            const tokens = generateTokens(user._id, user.role, profile ? profile._id : null);
-            
-            res.json({
-                _id: user._id,
-                profileId: profile ? profile._id : null,
-                fullName: profile ? profile.fullName : '',
-                email: user.email,
-                role: user.role,
-                status: profile ? profile.status : 'Active',
-                onboardingComplete: profile && profile.status ? profile.status !== 'Pending' : true,
-                accessToken: tokens.accessToken,
-                refreshToken: tokens.refreshToken
-            });
-        } else {
-            res.status(401).json({ message: 'Invalid email or password' });
+        let profile;
+        if (user.role === 'nurse') {
+            profile = await Nurse.findOne({ userId: user._id });
+        } else if (user.role === 'patient') {
+            profile = await Patient.findOne({ userId: user._id });
+        } else if (user.role === 'admin') {
+            profile = await Admin.findOne({ userId: user._id });
         }
+
+        res.json({
+            _id: user._id,
+            profileId: profile ? profile._id : null,
+            fullName: profile ? profile.fullName : '',
+            email: user.email,
+            role: user.role,
+            status: profile ? profile.status : 'Active',
+            onboardingComplete: profile && profile.onboardingComplete !== undefined ? profile.onboardingComplete : true
+        });
     } catch (error) {
-        res.status(500).json({ message: 'Server error during login', error: error.message });
+        res.status(500).json({ message: 'Server error fetching user profile', error: error.message });
     }
 };
 
@@ -145,111 +98,5 @@ exports.registerNurse = (req, res) => registerUser(req, res, 'nurse');
 exports.registerPatient = (req, res) => registerUser(req, res, 'patient');
 exports.registerAdmin = (req, res) => registerUser(req, res, 'admin');
 
-// Refresh Token Handler
-exports.refreshToken = async (req, res) => {
-    const { token } = req.body;
-    if (!token) return res.status(401).json({ message: 'Refresh token required' });
-
-    try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const tokens = generateTokens(decoded.id, decoded.role, decoded.profileId);
-        res.json(tokens);
-    } catch (error) {
-        res.status(403).json({ message: 'Invalid or expired refresh token' });
-    }
-};
-
-// Forgot Password
-exports.forgotPassword = async (req, res) => {
-    const { email } = req.body;
-    if (!email) return res.status(400).json({ message: 'Please provide an email' });
-
-    try {
-        const user = await User.findOne({ email });
-
-        if (!user) {
-            return res.status(404).json({ message: 'There is no user with that email' });
-        }
-
-        // Generate token
-        const resetToken = crypto.randomBytes(20).toString('hex');
-        
-        // Hash token and set to resetPasswordToken field
-        user.resetPasswordToken = crypto.createHash('sha256').update(resetToken).digest('hex');
-        
-        // Set expire (10 minutes)
-        user.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
-        await user.save({ validateBeforeSave: false });
-
-        // Create reset url (frontend URL)
-        const resetUrl = `http://localhost:3000/reset-password?token=${resetToken}&role=${user.role}`;
-        const message = `You are receiving this email because you (or someone else) has requested the reset of a password. Please make a PUT request to: \n\n ${resetUrl}`;
-
-        await sendEmail({
-            email: user.email,
-            subject: 'Password Reset Token',
-            message
-        });
-
-        res.status(200).json({ message: 'Email sent' });
-    } catch (error) {
-        const user = await User.findOne({ email: req.body.email });
-        if (user) {
-            user.resetPasswordToken = undefined;
-            user.resetPasswordExpire = undefined;
-            await user.save({ validateBeforeSave: false });
-        }
-        res.status(500).json({ message: 'Email could not be sent', error: error.message });
-    }
-};
-
-// Reset Password
-exports.resetPassword = async (req, res) => {
-    const { token, password } = req.body;
-    
-    try {
-        // Get hashed token
-        const resetPasswordToken = crypto.createHash('sha256').update(token).digest('hex');
-        
-        const user = await User.findOne({
-            resetPasswordToken,
-            resetPasswordExpire: { $gt: Date.now() }
-        });
-
-        if (!user) {
-            return res.status(400).json({ message: 'Invalid token' });
-        }
-
-        // Set new password
-        const salt = await bcrypt.genSalt(12);
-        user.password = await bcrypt.hash(password, salt);
-        user.resetPasswordToken = undefined;
-        user.resetPasswordExpire = undefined;
-        await user.save();
-
-        res.status(200).json({ message: 'Password reset successful' });
-    } catch (error) {
-        res.status(500).json({ message: 'Server error during password reset', error: error.message });
-    }
-};
-
-// Verify Email
-exports.verifyEmail = async (req, res) => {
-    try {
-        const emailVerificationToken = crypto.createHash('sha256').update(req.params.token).digest('hex');
-        
-        const user = await User.findOne({ emailVerificationToken });
-        
-        if (!user) {
-            return res.status(400).json({ message: 'Invalid token' });
-        }
-        
-        user.emailVerified = true;
-        user.emailVerificationToken = undefined;
-        await user.save();
-        
-        res.status(200).json({ message: 'Email verified successfully' });
-    } catch (error) {
-        res.status(500).json({ message: 'Server error during email verification', error: error.message });
-    }
-};
+// Note: login, refreshToken, forgotPassword, resetPassword, and verifyEmail 
+// have been removed because Firebase Authentication handles them entirely on the frontend!
