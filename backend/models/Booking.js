@@ -5,10 +5,15 @@ const bookingSchema = new mongoose.Schema({
     patientId: { type: mongoose.Schema.Types.ObjectId, ref: 'Patient', required: true },
     status: { 
         type: String, 
-        enum: ['Requested', 'Accepted', 'In Progress', 'Completed', 'Cancelled', 'Disputed'],
+        enum: ['Requested', 'Accepted', 'Declined', 'In Progress', 'Completed', 'Cancelled', 'Disputed'],
         default: 'Requested'
     },
+    completionApprovals: {
+        patientApproved: { type: Boolean, default: false },
+        nurseApproved: { type: Boolean, default: false }
+    },
     matchedAt: { type: Date },
+    hasReviewed: { type: Boolean, default: false },
     
     // The specific details of the care request
     careDetails: {
