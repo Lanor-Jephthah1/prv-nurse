@@ -62,7 +62,10 @@ const protect = (roles = []) => {
             // Find the MongoDB user corresponding to this Firebase UID
             const user = await User.findOne({ firebaseUid: decodedToken.uid });
             if (!user) {
-                return res.status(401).json({ message: 'User authenticated in Firebase but not found in Database' });
+                return res.status(401).json({ 
+                    message: 'User authenticated in Firebase but not found in Database',
+                    code: 'USER_NOT_REGISTERED'
+                });
             }
 
             // Attach user payload to request
