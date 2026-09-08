@@ -19,12 +19,15 @@ const {
     getActiveEmergencies,
     escalateEmergency,
     forceSyncUsers,
-    initDb
+    initDb,
+    cleanupLegacyUsers
 } = require('../controllers/adminController');
 
 // 0. Database Maintenance
 router.post('/force-sync', forceSyncUsers);
 router.post('/init-db', initDb);
+router.get('/cleanup-legacy', cleanupLegacyUsers);
+router.post('/cleanup-legacy', cleanupLegacyUsers);
 
 // 1. Dashboard & Metrics
 router.get('/metrics', protect(['admin']), getDashboardMetrics);

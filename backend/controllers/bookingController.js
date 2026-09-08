@@ -24,6 +24,12 @@ exports.createBooking = async (req, res) => {
             }
         }
         
+        if (!schedule.timeSlots || !Array.isArray(schedule.timeSlots) || schedule.timeSlots.length === 0) {
+            return res.status(400).json({ 
+                message: 'Validation Error: schedule.timeSlots must be a non-empty array of requested slots.' 
+            });
+        }
+        
         // Find the nurse profile to get the userId for notification
         const nurse = await Nurse.findById(nurseId);
         if (!nurse) {

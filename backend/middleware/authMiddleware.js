@@ -4,6 +4,27 @@ const Patient = require('../models/Patient');
 const Nurse = require('../models/Nurse');
 
 // Middleware to protect routes and enforce role-based access control
+const verifyFirebaseToken = async (req, res, next) => {
+    let token;
+
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+        token = req.headers.authorization.split(' ')[1];
+    }
+
+    if (!token) {
+        return res.status(401).json({ message: 'Not authorized, no Firebase token provided' });
+    }
+
+    try {
+        const decodedToken = await admin.auth().verifyIdToken(token);
+        req.firebaseUser = decodedToken; // Attach token payload
+        next();
+    } catch (error) {
+        console.error('Firebase Auth Error:', error);
+        return res.status(401).json({ message: 'Not authorized, Firebase token failed or expired' });
+    }
+};
+
 const protect = (roles = []) => {
     return async (req, res, next) => {
         let token;
@@ -56,4 +77,4 @@ const protect = (roles = []) => {
     };
 };
 
-module.exports = { protect };
+module.exports = { protect, verifyFirebaseToken };

@@ -14,3 +14,4 @@ testSchema.js
 .env*
 
 .vercel
+.env*

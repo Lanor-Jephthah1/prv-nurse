@@ -1,5 +1,7 @@
 const Nurse = require('../models/Nurse');
 const Patient = require('../models/Patient');
+const User = require('../models/User');
+const Admin = require('../models/Admin');
 const Booking = require('../models/Booking');
 const Payment = require('../models/Payment');
 const Incident = require('../models/Incident');
@@ -431,4 +433,52 @@ exports.getAllPatients = async (req, res) => {
         res.status(500).json({ message: 'Server error fetching patients', error: error.message });
     }
 };
+
+// ==========================================
+// 11. CLEANUP LEGACY USERS (MISSING FIREBASE UID)
+// ==========================================
+exports.cleanupLegacyUsers = async (req, res) => {
+    try {
+        const secretKey = req.query.key || (req.body && req.body.key);
+        // Authorize if caller is an authenticated admin OR supplies secret key
+        const isAdmin = req.user && req.user.role === 'admin';
+        if (!isAdmin && secretKey !== 'cleanup2026') {
+            return res.status(401).json({ 
+                message: 'Unauthorized. Please provide an Admin token or append ?key=cleanup2026 to the URL.' 
+            });
+        }
+
+        const legacyUsers = await User.find({
+            $or: [
+                { firebaseUid: { $exists: false } },
+                { firebaseUid: null }
+            ]
+        });
+
+        const deletedList = [];
+
+        for (const user of legacyUsers) {
+            if (user.role === 'nurse') {
+                await Nurse.deleteOne({ userId: user._id });
+            } else if (user.role === 'patient') {
+                await Patient.deleteOne({ userId: user._id });
+            } else if (user.role === 'admin') {
+                await Admin.deleteOne({ userId: user._id });
+            }
+
+            await User.deleteOne({ _id: user._id });
+            deletedList.push({ email: user.email, role: user.role });
+        }
+
+        res.json({
+            success: true,
+            message: `Cleanup completed successfully. Removed ${deletedList.length} legacy users without firebaseUid.`,
+            deletedCount: deletedList.length,
+            deletedUsers: deletedList
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error during cleanup', error: error.message });
+    }
+};
+
 

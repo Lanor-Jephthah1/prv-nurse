@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { protect } = require('../middleware/authMiddleware');
+const { protect, verifyFirebaseToken } = require('../middleware/authMiddleware');
 const { 
     registerNurse, 
     registerPatient, 
@@ -9,9 +9,9 @@ const {
 } = require('../controllers/authController');
 
 // Registration Routes (Sync Firebase UID to MongoDB)
-router.post('/register/nurse', registerNurse);
-router.post('/register/patient', registerPatient);
-router.post('/register/admin', registerAdmin);
+router.post('/register/nurse', verifyFirebaseToken, registerNurse);
+router.post('/register/patient', verifyFirebaseToken, registerPatient);
+router.post('/register/admin', verifyFirebaseToken, registerAdmin);
 
 // Fetch Profile Route (Requires Firebase Token)
 router.get('/me', protect(['patient', 'nurse', 'admin']), getMe);
