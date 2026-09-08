@@ -17,6 +17,15 @@ const verifyFirebaseToken = async (req, res, next) => {
 
     try {
         const decodedToken = await admin.auth().verifyIdToken(token);
+        
+        // STRICT EMAIL VERIFICATION CHECK
+        if (decodedToken.email && !decodedToken.email_verified) {
+            return res.status(403).json({ 
+                message: 'Email not verified. Please verify your email address before continuing.',
+                code: 'EMAIL_NOT_VERIFIED'
+            });
+        }
+
         req.firebaseUser = decodedToken; // Attach token payload
         next();
     } catch (error) {
@@ -41,6 +50,14 @@ const protect = (roles = []) => {
         try {
             // Verify Firebase token
             const decodedToken = await admin.auth().verifyIdToken(token);
+            
+            // STRICT EMAIL VERIFICATION CHECK
+            if (decodedToken.email && !decodedToken.email_verified) {
+                return res.status(403).json({ 
+                    message: 'Email not verified. Please verify your email address before continuing.',
+                    code: 'EMAIL_NOT_VERIFIED'
+                });
+            }
             
             // Find the MongoDB user corresponding to this Firebase UID
             const user = await User.findOne({ firebaseUid: decodedToken.uid });
