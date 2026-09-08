@@ -3,7 +3,11 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const Admin = require('../models/Admin');
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://mclanorjeff_db_user:YlpWleWEYVGmKDbJ@prn-nurse-db.gesn8uo.mongodb.net/prvnurse?appName=prn-nurse-db';
+const MONGO_URI = process.env.MONGO_URI;
+if (!MONGO_URI) {
+    console.error('MONGO_URI environment variable is not defined.');
+    process.exit(1);
+}
 
 const createAdmin = async () => {
     // Pass email as an argument: node createAdmin.js <email>
