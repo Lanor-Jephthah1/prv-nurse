@@ -374,3 +374,59 @@ exports.addVisitNote = async (req, res) => {
     }
 };
 
+// @desc    Cancel a booking request or active booking (Patient, Nurse, Admin)
+// @route   PATCH /api/bookings/:id/cancel or POST /api/bookings/:id/cancel or DELETE /api/bookings/:id
+// @access  Private (Patient, Nurse, Admin)
+exports.cancelBooking = async (req, res) => {
+    try {
+        const bookingId = req.params.id;
+        const booking = await Booking.findById(bookingId);
+        if (!booking) return res.status(404).json({ message: 'Booking not found' });
+
+        // Authorization check: Must be the patient who created the booking, the assigned nurse, or an admin
+        if (req.user.role === 'patient' && booking.patientId.toString() !== req.user.profileId) {
+            return res.status(403).json({ message: 'Not authorized to cancel this booking' });
+        }
+        if (req.user.role === 'nurse' && booking.nurseId.toString() !== req.user.profileId) {
+            return res.status(403).json({ message: 'Not authorized to cancel this booking' });
+        }
+
+        if (['Completed', 'Cancelled'].includes(booking.status)) {
+            return res.status(400).json({ 
+                message: `Cannot cancel a booking that is already ${booking.status.toLowerCase()}.` 
+            });
+        }
+
+        booking.status = 'Cancelled';
+        const updatedBooking = await booking.save();
+
+        // Notify the OTHER party
+        let recipientUserId = null;
+        if (req.user.role === 'patient') {
+            const nurse = await Nurse.findById(booking.nurseId);
+            recipientUserId = nurse ? nurse.userId : null;
+        } else {
+            const patient = await Patient.findById(booking.patientId);
+            recipientUserId = patient ? patient.userId : null;
+        }
+
+        if (recipientUserId) {
+            await Notification.create({
+                userId: recipientUserId,
+                title: 'Booking Request Cancelled',
+                message: `Booking request on ${new Date(booking.schedule.startDate).toLocaleDateString()} was cancelled.`,
+                type: 'Booking',
+                link: `/bookings/${booking._id}`
+            }).catch(err => console.error('Notification error on cancel:', err));
+        }
+
+        res.json({
+            message: 'Booking request successfully cancelled.',
+            booking: updatedBooking
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error cancelling booking', error: error.message });
+    }
+};
+
+
