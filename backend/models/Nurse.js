@@ -81,7 +81,10 @@ const nurseSchema = new mongoose.Schema({
     ratings: {
         averageRating: { type: Number, default: 0 },
         totalReviews: { type: Number, default: 0 }
-    }
+    },
+    // Earnings
+    earnings: { type: Number, default: 0 },
+    totalEarnings: { type: Number, default: 0 }
 }, { timestamps: true });
 
 nurseSchema.index({ location: '2dsphere' });

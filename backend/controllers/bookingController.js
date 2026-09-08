@@ -2,6 +2,7 @@ const Booking = require('../models/Booking');
 const Notification = require('../models/Notification');
 const Nurse = require('../models/Nurse');
 const Patient = require('../models/Patient');
+const Payment = require('../models/Payment');
 
 // Helper to determine if two bookings overlap in date, time, or shift slot for a nurse
 const checkBookingOverlap = (b1Schedule, b2Schedule) => {
@@ -250,7 +251,33 @@ exports.updateBookingStatus = async (req, res) => {
 
             // Only mark as fully 'Completed' if both parties have approved
             if (booking.completionApprovals.nurseApproved && booking.completionApprovals.patientApproved) {
+                const wasAlreadyCompleted = booking.status === 'Completed';
                 booking.status = 'Completed';
+
+                // Increase the nurse's earnings by the amount charged for this session
+                if (!wasAlreadyCompleted) {
+                    const sessionAmount = booking.totalAmount || booking.agreedRate || 0;
+                    if (sessionAmount > 0) {
+                        const nurse = await Nurse.findById(booking.nurseId);
+                        if (nurse) {
+                            nurse.earnings = (nurse.earnings || 0) + sessionAmount;
+                            nurse.totalEarnings = (nurse.totalEarnings || 0) + sessionAmount;
+                            await nurse.save();
+                        }
+
+                        // Record payment transaction for bookkeeping and metrics
+                        const serviceFee = sessionAmount * 0.10; // 10% platform fee
+                        await Payment.create({
+                            bookingId: booking._id,
+                            patientId: booking.patientId,
+                            nurseId: booking.nurseId,
+                            amount: sessionAmount,
+                            serviceFee: serviceFee,
+                            momoRef: 'COMPLETED-' + booking._id.toString().slice(-6),
+                            status: 'Disbursed'
+                        }).catch(err => console.error('Payment creation error on completion:', err));
+                    }
+                }
             } else {
                 // Return early if we are just marking approval but it's not fully completed yet.
                 await booking.save();
