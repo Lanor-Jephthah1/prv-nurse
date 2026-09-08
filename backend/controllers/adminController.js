@@ -339,7 +339,6 @@ exports.escalateEmergency = async (req, res) => {
 // ==========================================
 // 8. MASTER SYNC (TEMPORARY MIGRATION)
 // ==========================================
-const User = require('../models/User');
 
 exports.forceSyncUsers = async (req, res) => {
     try {
