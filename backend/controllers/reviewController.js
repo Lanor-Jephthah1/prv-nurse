@@ -1,17 +1,41 @@
 const Review = require('../models/Review');
 const Booking = require('../models/Booking');
 const Nurse = require('../models/Nurse');
-const { analyzeFeedback } = require('../utils/sentimentAnalyzer');
+const { processReviewAsync } = require('../events/reviewPipeline');
 
-// @desc    Submit a review for a completed booking
+// @desc    Submit a review for a completed booking (Asynchronous Decoupled)
 // @route   POST /api/reviews
 // @access  Private (Patient only)
 exports.createReview = async (req, res) => {
     try {
-        const { bookingId, feedbackArray, rating } = req.body;
+        let { bookingId, feedbackArray, rating } = req.body;
 
-        if (!bookingId || !feedbackArray || !Array.isArray(feedbackArray)) {
-            return res.status(400).json({ message: 'Booking ID and feedback array are required.' });
+        // Support direct fields if frontend sends them outside feedbackArray
+        let feedback = feedbackArray;
+        if (!feedback || !Array.isArray(feedback)) {
+            const categories = [
+                { key: 'punctuality', name: 'Punctuality' },
+                { key: 'professionalism', name: 'Professionalism' },
+                { key: 'compassion', name: 'Compassion' },
+                { key: 'communication', name: 'Communication' },
+                { key: 'clinicalSkills', name: 'Clinical Skills' },
+                { key: 'clinical_skills', name: 'Clinical Skills' }
+            ];
+            
+            const constructed = [];
+            categories.forEach(cat => {
+                if (req.body[cat.key] && typeof req.body[cat.key] === 'string' && req.body[cat.key].trim()) {
+                    constructed.push({ category: cat.name, text: req.body[cat.key].trim() });
+                }
+            });
+
+            if (constructed.length > 0) {
+                feedback = constructed;
+            }
+        }
+
+        if (!bookingId || !feedback || !Array.isArray(feedback) || feedback.length === 0) {
+            return res.status(400).json({ message: 'Booking ID and feedback (either feedbackArray or fields like punctuality, professionalism, compassion, communication, clinicalSkills) are required.' });
         }
 
         // Verify the booking
@@ -23,63 +47,68 @@ exports.createReview = async (req, res) => {
         if (booking.status !== 'Completed') {
             return res.status(400).json({ message: 'You can only review completed visits.' });
         }
+
+        // 14-Day Review Window Restriction
+        const completionDate = booking.updatedAt;
+        const fourteenDaysInMs = 14 * 24 * 60 * 60 * 1000;
+        if (Date.now() - new Date(completionDate).getTime() > fourteenDaysInMs) {
+            return res.status(403).json({ message: 'The 14-day review window for this booking has expired. Reviews must be submitted within 14 days of completion to prevent retrospective tampering.' });
+        }
+
         if (booking.hasReviewed) {
             return res.status(400).json({ message: 'You have already reviewed this visit.' });
         }
 
-        // Perform Standard Model Sentiment Analysis on each sentence/category!
-        const analysis = analyzeFeedback(feedbackArray);
-        
-        // Decide final rating
-        const finalRating = rating ? rating : analysis.rating;
-
-        // Create the review
+        // 1. Create initial review record immediately (status: 'Processing')
         const review = await Review.create({
             bookingId,
-            patientId: req.user.profileId, // We store this internally, but never expose it
+            patientId: req.user.profileId,
             nurseId: booking.nurseId,
-            feedback: analysis.feedbackDetails,
-            rating: finalRating,
-            overallSentimentScore: analysis.overallScore,
-            tags: analysis.tags,
-            status: analysis.status
+            feedback: feedback.map(f => ({ category: f.category, text: f.text, sentimentScore: 0 })),
+            rating: rating || 0,
+            status: 'Processing'
         });
 
-        // Mark booking as reviewed
+        // 2. Mark booking as reviewed immediately so user cannot double-submit
         booking.hasReviewed = true;
         await booking.save();
 
-        // Update Nurse's overall stats
-        const nurse = await Nurse.findById(booking.nurseId);
-        if (nurse) {
-            const currentTotal = nurse.ratings.totalReviews || 0;
-            const currentAverage = nurse.ratings.averageRating || 0;
-            
-            const newTotal = currentTotal + 1;
-            const newAverage = ((currentAverage * currentTotal) + finalRating) / newTotal;
-            
-            nurse.ratings.totalReviews = newTotal;
-            nurse.ratings.averageRating = Number(newAverage.toFixed(1));
+        // 3. Trigger Decoupled Background Event Pipeline (AI analysis & Nurse ranking)
+        // Fire-and-forget: Runs asynchronously without blocking the patient HTTP response!
+        processReviewAsync({
+            reviewId: review._id,
+            nurseId: booking.nurseId,
+            bookingId,
+            feedback,
+            explicitRating: rating,
+            io: req.io
+        });
 
-            // Add extracted tags to nurse's skills list
-            if (analysis.tags && analysis.tags.length > 0) {
-                const uniqueTags = new Set([...(nurse.skills || []), ...analysis.tags]);
-                nurse.skills = Array.from(uniqueTags);
-            }
-
-            await nurse.save();
-        }
-
-        res.status(201).json({
-            message: analysis.status === 'Flagged' 
-                ? 'Review submitted. It has been flagged for admin review.' 
-                : 'Review submitted successfully! Your feedback is completely anonymous.',
-            review
+        // 4. Return instant 202 Accepted response (<20ms latency)
+        res.status(202).json({
+            success: true,
+            message: 'Review submitted successfully! AI analysis is being processed in the background.',
+            status: 'Processing',
+            reviewId: review._id
         });
     } catch (error) {
         if (error.code === 11000) {
             return res.status(400).json({ message: 'You have already reviewed this visit.' });
         }
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+// @desc    Get status of an asynchronous processing review
+// @route   GET /api/reviews/status/:id
+// @access  Private (Patient, Nurse, Admin)
+exports.getReviewStatus = async (req, res) => {
+    try {
+        const review = await Review.findById(req.params.id)
+            .select('status rating tags overallSentimentScore createdAt');
+        if (!review) return res.status(404).json({ message: 'Review not found' });
+        res.json(review);
+    } catch (error) {
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 };

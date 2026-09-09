@@ -13,11 +13,11 @@ const reviewSchema = new mongoose.Schema({
   }],
   
   // Final calculated or user-provided rating
-  rating: { type: Number, required: true, min: 1, max: 5 },
+  rating: { type: Number, min: 0, max: 5, default: 0 },
   overallSentimentScore: { type: Number, default: 0 },
   tags: [{ type: String }],
   
-  status: { type: String, enum: ['Published', 'Flagged'], default: 'Published' },
+  status: { type: String, enum: ['Processing', 'Published', 'Flagged'], default: 'Processing' },
   
   createdAt: { type: Date, default: Date.now }
 }, { timestamps: true });

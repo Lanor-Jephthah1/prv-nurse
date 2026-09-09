@@ -80,7 +80,15 @@ const nurseSchema = new mongoose.Schema({
     status: { type: String, enum: ['Pending', 'Docs Verified', 'Background Cleared', 'Active', 'Suspended', 'Rejected'], default: 'Pending' },
     ratings: {
         averageRating: { type: Number, default: 0 },
-        totalReviews: { type: Number, default: 0 }
+        totalReviews: { type: Number, default: 0 },
+        weightedRating: { type: Number, default: 0 }, // Bayesian ranking score for fair sorting
+        categoryAverages: {
+            punctuality: { type: Number, default: 0 },
+            professionalism: { type: Number, default: 0 },
+            compassion: { type: Number, default: 0 },
+            communication: { type: Number, default: 0 },
+            clinicalSkills: { type: Number, default: 0 }
+        }
     },
     // Earnings
     earnings: { type: Number, default: 0 },

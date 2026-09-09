@@ -87,7 +87,8 @@ exports.updateProfile = async (req, res) => {
 exports.getActiveNurses = async (req, res) => {
     try {
         const nurses = await Nurse.find({ status: 'Active' })
-                                  .select('-password -nationalId -licenseNumber');
+                                  .select('-password -nationalId -licenseNumber')
+                                  .sort({ 'ratings.weightedRating': -1, 'ratings.averageRating': -1, createdAt: -1 });
         res.json(nurses);
     } catch (error) {
         res.status(500).json({ message: 'Server error', error: error.message });
